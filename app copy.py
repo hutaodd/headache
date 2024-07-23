@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, time
 import altair as alt
 
 # 加载数据
@@ -8,7 +8,7 @@ def load_data():
     try:
         data = pd.read_csv('headache_data.csv')
     except FileNotFoundError:
-        data = pd.DataFrame(columns=['Date', 'Start Time', 'End Time', 'Duration', 'Severity', 'Remarks', 'Location'])
+        data = pd.DataFrame(columns=['Date', 'Start Time', 'End Time', 'Duration', 'Severity', 'Remarks', 'Location', 'Total Minutes'])
     return data
 
 # 保存数据
@@ -28,26 +28,41 @@ st.sidebar.title('头痛记录系统')
 # 添加头痛记录
 st.sidebar.header('添加头痛记录')
 with st.sidebar.form('headache_form'):
+    # 默认时间设置为 00:00
+    default_time = time(0, 0)
+    
+    # 日期选择器
     date = st.date_input('日期', datetime.now().date())
-    start_time = st.time_input('头痛开始时间', datetime.now().time().replace(second=0, microsecond=0))
-    end_time = st.time_input('头痛结束时间', datetime.now().time().replace(second=0, microsecond=0))
+    
+    # 时间选择器，默认时间为 00:00
+    start_time = st.time_input('头痛开始时间', value=default_time)
+    end_time = st.time_input('头痛结束时间', value=default_time)
+
+    # 其他表单字段
     severity = st.slider('严重程度', 1, 5, 1)
     remarks = st.text_area('备注')
-    location = st.multiselect('头痛部位', ['左侧', '右侧', '双侧'])
+    location = st.radio('头痛部位', ['左侧', '右侧', '双侧'])
+    
+    # 提交按钮
     submitted = st.form_submit_button('添加记录')
-
+    
     if submitted:
         try:
-            start_datetime = datetime.combine(date, start_time)
-            end_datetime = datetime.combine(date, end_time)
-            duration, total_minutes = calculate_duration(start_datetime, end_datetime)
-            location_str = ', '.join(location) if location else '未选择'
-            new_record = pd.DataFrame([[date, start_datetime.strftime('%Y-%m-%d %H:%M'), end_datetime.strftime('%Y-%m-%d %H:%M'), duration, severity, remarks, location_str, total_minutes]],
-                                      columns=['Date', 'Start Time', 'End Time', 'Duration', 'Severity', 'Remarks', 'Location', 'Total Minutes'])
-            data = load_data()
-            data = pd.concat([data, new_record], ignore_index=True)
-            save_data(data)
-            st.sidebar.success('记录已添加')
+            if date and start_time and end_time:
+                start_datetime = datetime.combine(date, start_time)
+                end_datetime = datetime.combine(date, end_time)
+                if start_datetime > end_datetime:
+                    st.sidebar.error('结束时间不能早于开始时间')
+                else:
+                    duration, total_minutes = calculate_duration(start_datetime, end_datetime)
+                    new_record = pd.DataFrame([[date, start_datetime.strftime('%Y-%m-%d %H:%M'), end_datetime.strftime('%Y-%m-%d %H:%M'), duration, severity, remarks, location, total_minutes]],
+                                              columns=['Date', 'Start Time', 'End Time', 'Duration', 'Severity', 'Remarks', 'Location', 'Total Minutes'])
+                    data = load_data()
+                    data = pd.concat([data, new_record], ignore_index=True)
+                    save_data(data)
+                    st.sidebar.success('记录已添加')
+            else:
+                st.sidebar.error('请确保所有字段都已正确填写')
         except ValueError:
             st.sidebar.error('时间格式错误，请检查输入时间')
 
@@ -60,7 +75,7 @@ if not data.empty:
         data = data.drop(record_to_delete).reset_index(drop=True)
         save_data(data)
         st.sidebar.success('记录已删除')
-        st.experimental_rerun()  # 刷新应用
+        st.rerun()  # 刷新应用
 
 # 选择要显示的图表类型
 st.sidebar.header('选择图表')
@@ -83,7 +98,10 @@ if not data.empty:
 # 显示头痛记录
 st.header('头痛记录列表')
 if not data.empty:
-    st.write(data)
+    edited_data = st.data_editor(data, use_container_width=True)
+    if st.button('更新记录'):
+        save_data(edited_data)
+        st.success('记录已更新')
 
 # 数据可视化
 st.header('数据可视化')
