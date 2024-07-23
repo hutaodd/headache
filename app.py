@@ -51,6 +51,17 @@ with st.sidebar.form('headache_form'):
         except ValueError:
             st.sidebar.error('时间格式错误，请检查输入时间')
 
+# 删除头痛记录
+st.sidebar.header('删除头痛记录')
+data = load_data()
+if not data.empty:
+    record_to_delete = st.sidebar.selectbox('选择要删除的记录', data.index, format_func=lambda x: f"日期: {data.loc[x, 'Date']} 开始时间: {data.loc[x, 'Start Time']} 结束时间: {data.loc[x, 'End Time']}")
+    if st.sidebar.button('删除记录'):
+        data = data.drop(record_to_delete).reset_index(drop=True)
+        save_data(data)
+        st.sidebar.success('记录已删除')
+        st.rerun()  # 刷新应用
+
 # 选择要显示的图表类型
 st.sidebar.header('选择图表')
 chart_type = st.sidebar.selectbox(
@@ -60,7 +71,6 @@ chart_type = st.sidebar.selectbox(
 
 # 下载数据
 st.sidebar.header('下载数据')
-data = load_data()
 if not data.empty:
     csv = data.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
     st.sidebar.download_button(
